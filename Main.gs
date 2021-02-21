@@ -32,9 +32,12 @@ const CertificateMailPos = 3;
 
 const SixHours = 6; // period of the script execution
 
-const CertBadgeUriToTeamsBadgeName = new Map([
-    ['https://api.youracclaim.com/api/v1/obi/v2/issuers/f4b8d042-0072-4a1a-8d00-260b513026e8/badge_classes/64567b66-def2-4c84-be6c-2586962fccd3', 'cncf_cka'],
-    ['https://api.youracclaim.com/api/v1/obi/v2/issuers/f4b8d042-0072-4a1a-8d00-260b513026e8/badge_classes/067f5afd-160d-42df-961e-31d19e117173', 'cncf_ckad'],
+// regular expression matching organization and badge UIDs from badge URL
+const BadgeUrlRegEx = new RegExp('^https:\/\/api.youracclaim.com\/api\/v1\/obi\/v2\/issuers\/([0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12})\/badge_classes\/([0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12})$');
+const LinuxFoundationUID = 'f4b8d042-0072-4a1a-8d00-260b513026e8';
+const BadgeClassUidToMomaBadgename = new Map([
+    ['64567b66-def2-4c84-be6c-2586962fccd3', 'cncf_cka'],
+    ['067f5afd-160d-42df-961e-31d19e117173', 'cncf_ckad'],
     ['unknown', 'cncf_cks'],
 ]);
 
@@ -131,14 +134,14 @@ function validateRecord(digitalBadgeId, mailAddr) {
         Logger.log("WARN: certificate '" + digitalBadgeId + "' is expired")
         return { isValid: false, badgeName: "" };
     }
-    if (certInfo.recipient.type != "email") {
+    if (certInfo.recipient.type !== "email") {
         Logger.log("WARN: Cannot verify recipient identity: unknown identity type");
         return { isValid: false, badgeName: "" };
     }
     if (certInfo.recipient.hashed) {
         let salt = certInfo.recipient.salt || "";
         let digest = "sha256$" + createDigest(Utilities.DigestAlgorithm.SHA_256, mailAddr + salt); // TODO: make smart choice of digest algorithm
-        if (certInfo.recipient.identity != digest) {
+        if (certInfo.recipient.identity !== digest) {
             Logger.log("WARN: invalid certificate: " + mailAddr + " is not the certificate recipient")
             return { isValid: false, badgeName: "" };
         }
@@ -146,11 +149,25 @@ function validateRecord(digitalBadgeId, mailAddr) {
         Logger.log("WARN: invalid certificate: " + mailAddr + " is not the certificate recipient")
         return { isValid: false, badgeName: "" };
     }
-    if (!certInfo.badge || !CertBadgeUriToTeamsBadgeName.has(certInfo.badge)) {
+    if (certInfo.badge) {
+        let matchedIds = BadgeUrlRegEx.exec(certInfo.badge);
+        if (matchedIds.length !== 3) {
+            Logger.log("WARN: invalid protocol response: badge Uri does not match expected format")
+            return { isValid: false, badgeName: "" };
+        }
+        if (matchedIds[1] !== LinuxFoundationUID) {
+            Logger.log("WARN: unsupported certificate: badge was issued by unsupported organization")
+            return { isValid: false, badgeName: "" };
+        }
+        if (!BadgeClassUidToMomaBadgename.has(matchedIds[2])) {
+            Logger.log("WARN: unsupported certificate: unsupported certification")
+            return { isValid: false, badgeName: "" };
+        }
+        return { isValid: true, badgeName: BadgeClassUidToMomaBadgename.get(matchedIds[2]) };
+    } else {
         Logger.log("WARN: invalid protocol response: certificate information missing badge Uri")
         return { isValid: false, badgeName: "" };
     }
-    return { isValid: true, badgeName: CertBadgeUriToTeamsBadgeName.get(certInfo.badge) };
 }
 
 function createDigest(method, message) {
