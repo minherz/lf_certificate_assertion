@@ -68,7 +68,12 @@ class CertificateValidator {
             this.notifications.forEach(function (notification) {
                 body.push(`${notification.submitter} | ${notification.badge} | ${notification.facts.join(", ")}`)
             })
-            MailApp.sendEmail(this.options.notificationsEmail, "SBU for CNCF badges notifications", body.join("\n\r"));
+            MailApp.sendEmail({
+                to: this.options.notificationsEmail,
+                subject: "SBU for CNCF badges notifications",
+                body: body.join("\n\r"),
+                noReply: true // go/yaqs-eng/q/9216203221041676288
+            });
         }
     }
 
