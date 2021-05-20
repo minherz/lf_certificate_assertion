@@ -22,7 +22,7 @@ const DigitalBadgeIdPos = 2;
 const CertificateMailPos = 3;
 
 // regular expression matching organization and badge UIDs from badge URL
-const BadgeUrlRegEx = new RegExp('^https:\/\/api.youracclaim.com\/api\/v1\/obi\/v2\/issuers\/([0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12})\/badge_classes\/([0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12})$');
+const BadgeUrlRegEx = new RegExp('^https:\/\/api.credly.com\/api\/v1\/obi\/v2\/issuers\/([0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12})\/badge_classes\/([0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12})$');
 const LinuxFoundationUID = 'f4b8d042-0072-4a1a-8d00-260b513026e8';
 const BadgeClassUidToMomaBadgename = new Map([
     ['64567b66-def2-4c84-be6c-2586962fccd3', 'cncf_cka'],
@@ -107,7 +107,7 @@ class CertificateValidator {
                 certMail = ldapMail;
             }
 
-            let fetchResponse = UrlFetchApp.fetch(`https://api.youracclaim.com/v1/obi/v2/badge_assertions/${digitalBadgeId}`, { muteHttpExceptions: true });
+            let fetchResponse = UrlFetchApp.fetch(`https://api.credly.com/v1/obi/v2/badge_assertions/${digitalBadgeId}`, { muteHttpExceptions: true });
             if (fetchResponse.getResponseCode() !== 200) {
                 this.notifications.push(new Notification(ldapMail, digitalBadgeId, [fetchResponse.getResponseCode(), fetchResponse.getContentText()]));
                 if (this.options.deleteInvalidCerts) {
