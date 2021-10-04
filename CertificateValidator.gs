@@ -27,7 +27,7 @@ const LinuxFoundationUID = 'f4b8d042-0072-4a1a-8d00-260b513026e8';
 const BadgeClassUidToMomaBadgename = new Map([
     ['64567b66-def2-4c84-be6c-2586962fccd3', 'cncf_cka'],
     ['067f5afd-160d-42df-961e-31d19e117173', 'cncf_ckad'],
-    ['unknown', 'cncf_cks'],
+    ['efc98036-fdf4-4c5c-b6ca-34e58c8d61bd', 'cncf_cks'],
 ]);
 
 

@@ -15,9 +15,9 @@ The script differentiates between different Kubernetes certificates using Credly
 
 | Badge | URL |
 |---|---|
-| CKA | `https://api.credly.com/api/v1/obi/v2/issuers/f4b8d042-0072-4a1a-8d00-260b513026e8/badge_classes/64567b66-def2-4c84-be6c-2586962fccd3` |
+| CKA  | `https://api.credly.com/api/v1/obi/v2/issuers/f4b8d042-0072-4a1a-8d00-260b513026e8/badge_classes/64567b66-def2-4c84-be6c-2586962fccd3` |
 | CKAD | `https://api.credly.com/api/v1/obi/v2/issuers/f4b8d042-0072-4a1a-8d00-260b513026e8/badge_classes/067f5afd-160d-42df-961e-31d19e117173` |
-| CKS | _will be supported soon_ |
+| CKS  | `https://api.credly.com/api/v1/obi/v2/issuers/f4b8d042-0072-4a1a-8d00-260b513026e8/badge_classes/efc98036-fdf4-4c5c-b6ca-34e58c8d61bd` |
 
 The validation process issues assertion request to the [OBI endpoint](https://www.credly.com/docs/obi_specified_endpoints#get-badge-assertion) and validates the following:
 
