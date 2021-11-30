@@ -54,7 +54,7 @@ if [[ $VALID_DIGEST != "sha256\$$DIGEST" ]]; then
     invalid=1
 fi
 
-if [ $invalid eq 0 ]; then
+if [ $invalid -eq 0 ]; then
    echo "Certificate is valid"
 fi
 echo $(echo -n $DATA | jq .evidence)
