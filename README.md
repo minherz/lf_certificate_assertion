@@ -39,21 +39,24 @@ SUBSCRIBER_EMAIL="your_email@used.at.registration"
 Then copy/paste the following script into the same shell session.
 
 ```bash
+invalid=0
 DATA=$(curl -sH "Content-Type: application/json" https://api.credly.com/v1/obi/v2/badge_assertions/$DIGITAL_BADGE_ID)
-EXP_DATE=$(echo -n $DATA | jq .expires)
+EXP_DATE=$(echo -n $DATA | jq -r .expires)
 NOW=$(TZ=UTC date +"%Y-%m-%d")"T"$(TZ=UTC date +"%T")".000Z"
 if [[ $EXP_DATE < $NOW ]]; then
     echo "Certificate is expired"
-    exit 1
+    invalid=1
 fi
 DIGEST=($(echo -n $SUBSCRIBER_EMAIL | sha256sum))
-VALID_DIGEST=$(echo -n $DATA | jq .recipient.identity)
+VALID_DIGEST=$(echo -n $DATA | jq -r .recipient.identity)
 if [[ $VALID_DIGEST != "sha256\$$DIGEST" ]]; then
     echo "Invalid certificate"
-    exit 1
+    invalid=1
 fi
 
-echo "Certificate is valid"
+if [ $invalid eq 0 ]; then
+   echo "Certificate is valid"
+fi
 echo $(echo -n $DATA | jq .evidence)
 ```
 
