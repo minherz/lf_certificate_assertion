@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+const SixHours = 6; // period of the script execution
 
 // NOTE: the following names of the sheets are expected
 // NOTE: if the spreadsheet lacks these sheets, the code will not run
@@ -24,40 +25,21 @@ const AutomationSheetName = "Automation";
 // NOTE: to a single form for all CNCF badges
 const LegacyResponsesSheetName = "Legacy Responses";
 
-// NOTE: positions and order of the columns match the form parameters.
-// NOTE: if the order of the form parameters changes, it should be reflected in these constants
-const SubmitterEmailPos = 1;
-const DigitalBadgeIdPos = 2;
-const CertificateMailPos = 3;
+function isValidSpreadsheet(spreadsheet) {
+    let responseSheet = getSheetByName(ResponsesSheetName);
+    let automationSheet = getSheetByName(AutomationSheetName);
 
-const SixHours = 6; // period of the script execution
-
-// regular expression matching organization and badge UIDs from badge URL
-const BadgeUrlRegEx = new RegExp('^https:\/\/api.youracclaim.com\/api\/v1\/obi\/v2\/issuers\/([0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12})\/badge_classes\/([0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12})$');
-const LinuxFoundationUID = 'f4b8d042-0072-4a1a-8d00-260b513026e8';
-const BadgeClassUidToMomaBadgename = new Map([
-    ['64567b66-def2-4c84-be6c-2586962fccd3', 'cncf_cka'],
-    ['067f5afd-160d-42df-961e-31d19e117173', 'cncf_ckad'],
-    ['unknown', 'cncf_cks'],
-]);
-
-function onOpen(e) {
-    if (!isValidSpreadsheet(SpreadsheetApp.getActiveSpreadsheet())) {
-        return;
+    if (!responseSheet || !automationSheet) {
+        return false;
     }
+}
 
-    let ui = SpreadsheetApp.getUi();
-    ui.createAddonMenu()
-        .addItem('Restart automation', 'restartAutomation')
-        .addToUi();
-
-    let triggers = ScriptApp.getProjectTriggers();
-    for (let i = 0; i < triggers.length; i++) {
-        if (triggers[i].getHandlerFunction() === runAutomation.name) {
-            return;
-        }
+function getSheetByName(name) {
+    let sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
+    if (!sheet) {
+        Logger.log("ERROR: spreadsheet has to have '" + name + "' sheet");
     }
-    restartAutomation();
+    return sheet;
 }
 
 function restartAutomation() {
@@ -76,121 +58,27 @@ function runAutomation() {
     let legacyResponseSheet = getSheetByName(LegacyResponsesSheetName);
     let responseSheet = getSheetByName(ResponsesSheetName);
     let automationSheet = getSheetByName(AutomationSheetName);
-    let receiverRows = [];
 
-    let results = validateRecords(responseSheet);
-    receiverRows.push(...results);
-    if (legacyResponseSheet) {
-        results = validateRecords(legacyResponseSheet);
-        receiverRows.push(...results);
-    }
-
-    // clean up automation sheet from "extra" rows starting after receiverRows.length (excluding header row)  
-    var n = automationSheet.getLastRow() - 1;
-    if (n > receiverRows.length) {
-        var range = automationSheet.getRange(receiverRows.length + 2, 1, n - receiverRows.length, 2);
-        range.clear();
-    }
-    // setup refreshed values for Teams badge automation
-    if (receiverRows.length > 0) {
-        range = automationSheet.getRange(2, 1, receiverRows.length, 2);
-        range.setValues(receiverRows);
-    }
+    validator = new CertificateValidator(true, "leoy+badges@google.com");
+    validator.validate(legacyResponseSheet, responseSheet);
+    validator.storeResultsTo(automationSheet);
 }
 
-function validateRecords(sheet) {
-    let values = sheet.getDataRange().getValues();
-    let validatedRecords = [];
-    // scan all submitted records bottom up in order to be able
-    // safely delete the expired or invalid records
-    for (let rowi = values.length - 1; rowi > 0; rowi--) {
-        let ldapMail = values[rowi][SubmitterEmailPos];
-        let digitalBadgeId = values[rowi][DigitalBadgeIdPos];
-        let certMail = values[rowi][CertificateMailPos];
-        if (certMail === "") {
-            certMail = ldapMail;
-        }
-        const { isValid, badgeName } = validateRecord(digitalBadgeId, certMail);
-        if (isValid && ldapMail) {
-            validatedRecords.push([ldapMail, badgeName]);
-        } else {
-            sheet.deleteRow(rowi + 1);
-        }
-    }
-    return validatedRecords;
-}
-
-function validateRecord(digitalBadgeId, mailAddr) {
-    let accessResponse = UrlFetchApp.fetch("https://api.youracclaim.com/v1/obi/v2/badge_assertions/" + digitalBadgeId, { muteHttpExceptions: true });
-    if (accessResponse.getResponseCode() !== 200) {
-        Logger.log("WARN: invalid certificate: " + digitalBadgeId + " is not a valid badge id")
-        return { isValid: false, badgeName: "" };
+function onOpen(e) {
+    if (!isValidSpreadsheet(SpreadsheetApp.getActiveSpreadsheet())) {
+        return;
     }
 
-    let certInfo = JSON.parse(accessResponse.getContentText());
-    let expireTime = Date.parse(certInfo.expires);
-    let now = new Date();
-    if (now.getTime() > expireTime) {
-        Logger.log("WARN: certificate '" + digitalBadgeId + "' is expired")
-        return { isValid: false, badgeName: "" };
-    }
-    if (certInfo.recipient.type !== "email") {
-        Logger.log("WARN: Cannot verify recipient identity: unknown identity type");
-        return { isValid: false, badgeName: "" };
-    }
-    if (certInfo.recipient.hashed) {
-        let salt = certInfo.recipient.salt || "";
-        let digest = "sha256$" + createDigest(Utilities.DigestAlgorithm.SHA_256, mailAddr + salt); // TODO: make smart choice of digest algorithm
-        if (certInfo.recipient.identity !== digest) {
-            Logger.log("WARN: invalid certificate: " + mailAddr + " is not the certificate recipient")
-            return { isValid: false, badgeName: "" };
-        }
-    } else if (certInfo.recipient.identity != mailAddr) {
-        Logger.log("WARN: invalid certificate: " + mailAddr + " is not the certificate recipient")
-        return { isValid: false, badgeName: "" };
-    }
-    if (certInfo.badge) {
-        let matchedIds = BadgeUrlRegEx.exec(certInfo.badge);
-        if (matchedIds.length !== 3) {
-            Logger.log("WARN: invalid protocol response: badge Uri does not match expected format")
-            return { isValid: false, badgeName: "" };
-        }
-        if (matchedIds[1] !== LinuxFoundationUID) {
-            Logger.log("WARN: unsupported certificate: badge was issued by unsupported organization")
-            return { isValid: false, badgeName: "" };
-        }
-        if (!BadgeClassUidToMomaBadgename.has(matchedIds[2])) {
-            Logger.log("WARN: unsupported certificate: unsupported certification")
-            return { isValid: false, badgeName: "" };
-        }
-        return { isValid: true, badgeName: BadgeClassUidToMomaBadgename.get(matchedIds[2]) };
-    } else {
-        Logger.log("WARN: invalid protocol response: certificate information missing badge Uri")
-        return { isValid: false, badgeName: "" };
-    }
-}
+    let ui = SpreadsheetApp.getUi();
+    ui.createAddonMenu()
+        .addItem('Restart automation', 'restartAutomation')
+        .addToUi();
 
-function createDigest(method, message) {
-    let digest = Utilities.computeDigest(method, message);
-    return digest.map(function (b) {
-        return ("0" + (b < 0 ? b + 256 : b).toString(16)).slice(-2);
-    })
-        .join("");
-}
-
-function isValidSpreadsheet(spreadsheet) {
-    let responseSheet = getSheetByName(ResponsesSheetName);
-    let automationSheet = getSheetByName(AutomationSheetName);
-
-    if (!responseSheet || !automationSheet) {
-        return false;
+    let triggers = ScriptApp.getProjectTriggers();
+    for (let i = 0; i < triggers.length; i++) {
+        if (triggers[i].getHandlerFunction() === runAutomation.name) {
+            return;
+        }
     }
-}
-
-function getSheetByName(name) {
-    let sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
-    if (!sheet) {
-        Logger.log("ERROR: spreadsheet has to have '" + name + "' sheet");
-    }
-    return sheet;
+    restartAutomation();
 }
