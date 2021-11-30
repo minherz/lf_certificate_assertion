@@ -30,20 +30,23 @@ The validation process issues assertion request to the [OBI endpoint](https://ww
 
 ## Manual validation
 
-It is possible to validate your LF badge manually. You will need to run the following script while replacing the `<registration_email_here>` with the valid email address that was used for the exam registration.
-Note that the script assumes the identity is hashed without salt. This can change in further versions of the API.
+It is possible to validate your LF badge credentials manually. First define the following environment variables:
+```bash
+DIGITAL_BADGE_ID="your-digital-badge-id"
+SUBSCRIBER_EMAIL="your_email@used.at.registration"
+```
+
+Then copy/paste the following script into the same shell session.
 
 ```bash
-DATA=$(curl -sH "Content-Type: application/json" \
-    https://api.credly.com/v1/obi/v2/badge_assertions/7e75e005-b03e-4347-af3c-dcab5e629df2)
+DATA=$(curl -sH "Content-Type: application/json" https://api.credly.com/v1/obi/v2/badge_assertions/$DIGITAL_BADGE_ID)
 EXP_DATE=$(echo -n $DATA | jq .expires)
 NOW=$(TZ=UTC date +"%Y-%m-%d")"T"$(TZ=UTC date +"%T")".000Z"
 if [[ $EXP_DATE < $NOW ]]; then
     echo "Certificate is expired"
     exit 1
 fi
-EMAIL="<registration_email_here>"
-DIGEST=$(echo -n $EMAIL | sha256sum)
+DIGEST=($(echo -n $SUBSCRIBER_EMAIL | sha256sum))
 VALID_DIGEST=$(echo -n $DATA | jq .recipient.identity)
 if [[ $VALID_DIGEST != "sha256\$$DIGEST" ]]; then
     echo "Invalid certificate"
