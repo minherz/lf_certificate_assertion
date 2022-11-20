@@ -47,7 +47,7 @@ if [[ $EXP_DATE < $NOW ]]; then
     echo "Certificate is expired"
     invalid=1
 fi
-DIGEST=($(echo -n $SUBSCRIBER_EMAIL | sha256sum))
+DIGEST=($(echo -n ${SUBSCRIBER_EMAIL,,} | sha256sum))
 VALID_DIGEST=$(echo -n $DATA | jq -r .recipient.identity)
 if [[ $VALID_DIGEST != "sha256\$$DIGEST" ]]; then
     echo "Invalid certificate"
