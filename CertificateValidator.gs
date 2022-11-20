@@ -141,7 +141,7 @@ class CertificateValidator {
         }
         if (certInfo.recipient.hashed) {
             let salt = certInfo.recipient.salt || "";
-            let digest = "sha256$" + CertificateValidator.createDigest(Utilities.DigestAlgorithm.SHA_256, mailAddr + salt); // TODO: make smart choice of digest algorithm
+            let digest = "sha256$" + CertificateValidator.createDigest(Utilities.DigestAlgorithm.SHA_256, mailAddr.toLowerCase() + salt); // TODO: make smart choice of digest algorithm
             if (certInfo.recipient.identity !== digest) {
                 return { isValid: false, badgeName: "", error: `${mailAddr} is not the certificate recipient` };
             }
